@@ -10,15 +10,15 @@ defmodule OnFlow.Channel do
   Connects to the GRPC server. Blocks the process until a connection is
   established.
   """
-  def connect(host \\ host()) do
-    GenServer.call(__MODULE__, {:connect, host})
+  def connect(host \\ host(), opts \\ []) do
+    GenServer.call(__MODULE__, {:connect, host, opts})
   end
 
   @doc """
   Connects to the GRPC server asynchronously.
   """
-  def connect_async(host \\ host()) do
-    GenServer.cast(__MODULE__, {:connect_async, host})
+  def connect_async(host \\ host(), opts \\ []) do
+    GenServer.cast(__MODULE__, {:connect_async, host, opts})
   end
 
   @doc """
@@ -42,11 +42,15 @@ defmodule OnFlow.Channel do
     schedule_ping()
 
     connect? = connect_on_start?()
+    opts = all_opts()
+
+    IO.puts("hii")
+    IO.inspect(opts)
 
     channel =
       case arg do
         %GRPC.Channel{} -> arg
-        _ -> if connect?, do: new_channel(host()), else: nil
+        _ -> if connect?, do: new_channel(host(), opts), else: nil
       end
 
     state = %{channel: channel, connected?: connect?}
@@ -55,8 +59,10 @@ defmodule OnFlow.Channel do
   end
 
   @impl true
-  def handle_call({:connect, host}, _from, state) do
-    channel = new_channel(host)
+  def handle_call({:connect, host, opts}, _from, state) do
+    IO.puts("call opts")
+    IO.inspect(opts)
+    channel = new_channel(host, opts)
     {:reply, channel, %{state | channel: channel}}
   end
 
@@ -65,8 +71,8 @@ defmodule OnFlow.Channel do
   end
 
   @impl true
-  def handle_cast({:connect_async, host}, state) do
-    {:noreply, %{state | channel: new_channel(host)}}
+  def handle_cast({:connect_async, host, opts}, state) do
+    {:noreply, %{state | channel: new_channel(host, opts)}}
   end
 
   @impl true
@@ -90,8 +96,8 @@ defmodule OnFlow.Channel do
     {:noreply, state}
   end
 
-  defp new_channel(host) do
-    {:ok, channel} = GRPC.Stub.connect(host)
+  defp new_channel(host, opts) do
+    {:ok, channel} = GRPC.Stub.connect(host, opts)
     channel
   end
 
@@ -104,6 +110,10 @@ defmodule OnFlow.Channel do
 
   defp host do
     Application.get_env(:on_flow, :host)
+  end
+
+  defp all_opts do
+    Application.get_all_env(:on_flow)
   end
 
   defp connect_on_start? do
